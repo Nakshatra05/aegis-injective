@@ -14,6 +14,8 @@ loadEnvConfig(process.cwd());
 async function main() {
   if (!process.env.DEPLOYER_PRIVATE_KEY)
     throw new Error("Set a funded testnet DEPLOYER_PRIVATE_KEY locally.");
+  if (!/^(0x)?[a-fA-F0-9]{64}$/.test(process.env.DEPLOYER_PRIVATE_KEY))
+    throw new Error("Deployer private key must be 32 bytes of hex.");
   const key = PrivateKey.fromHex(process.env.DEPLOYER_PRIVATE_KEY);
   const owner = key.toBech32();
   const wasm = await readFile(

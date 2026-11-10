@@ -150,12 +150,18 @@ TypeScript tests cover exact decimals beyond JavaScript's safe integer range, pr
 
 Deploy the repository to Vercel as a Next.js project using Node 22. Configure production secrets securely in Vercel, not Git. Set `APP_ORIGIN` to the actual production domain. Public variables require rebuilding. A PostgreSQL service must be reachable from Vercel; no separate agent runner is needed because each execution is explicitly user-triggered through an authenticated route.
 
+### Supabase PostgreSQL
+
+Create a Supabase project, then choose **Connect → Transaction pooler**. Copy the PostgreSQL URI (port 6543), substitute the database password with URL encoding where needed, and save it as sensitive `DATABASE_URL` in Vercel's Production environment. Use the database-owner connection, not the project URL, anon key, or service-role API key. Redeploy after configuration. The server uses `postgres` with prepared statements disabled, a three-connection limit, and short idle timeouts. It creates its tables on first use and enables row-level security with no public policies; the server database owner bypasses RLS. Never expose the connection string through a `NEXT_PUBLIC_` variable.
+
+Official instructions: https://supabase.com/docs/guides/database/connecting-to-postgres
+
 ## Remaining limits and next steps
 
 - Complete funded testnet deployment and record a genuine successful buy and genuinely included policy-rejected transaction.
 - Complete connected Keplr end-to-end tests, including wallet rejection and refresh while pending. Missing-wallet behavior is distinct from a wallet-signed transaction rejection.
 - Configure and exercise hosted PostgreSQL and optional AI provider; absence stays explicit in UI.
-- An unresolved agent transaction intentionally blocks subsequent signing to avoid sequence races. Inspect/reconcile it before retrying; recovery tooling is required for abandoned prepared transactions or expired transaction timeouts.
+- An unresolved agent transaction intentionally blocks subsequent signing to avoid sequence races. The activity recovery action rebroadcasts only the identical saved transaction, or releases its reservation after its chain timeout has passed. It never labels an unknown outcome as a successful fill.
 - This is one testnet market with compile-time denoms/ticks. No derivatives, leverage, arbitrary routes, multi-chain logic, daily resets, or autonomous scheduled trading.
 - Revocation is effective on inclusion; it cannot undo prior trades or outrun an already included execution.
 - Independent security review, hardened rate limiting, operational recovery, and reproducible optimizer validation remain necessary before any broader use.

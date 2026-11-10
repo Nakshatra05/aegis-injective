@@ -12,9 +12,13 @@ if (existing.includes("DEPLOYER_PRIVATE_KEY=")) {
 }
 const deployer = PrivateKey.fromHex(randomBytes(32).toString("hex")),
   agent = PrivateKey.fromHex(randomBytes(32).toString("hex"));
+for (const key of [deployer, agent]) {
+  if (PrivateKey.fromHex(key.toPrivateKeyHex()).toBech32() !== key.toBech32())
+    throw new Error("Private key persistence round-trip failed");
+}
 await writeFile(
   ".env.local",
-  `${existing}\nDEPLOYER_PRIVATE_KEY=${deployer.toHex()}\nAGENT_PRIVATE_KEY=${agent.toHex()}\nNEXT_PUBLIC_AGENT_ADDRESS=${agent.toBech32()}\nSESSION_SECRET=${randomBytes(48).toString("hex")}\nAPP_ORIGIN=http://localhost:3000\n`,
+  `${existing}\nDEPLOYER_PRIVATE_KEY=${deployer.toPrivateKeyHex()}\nAGENT_PRIVATE_KEY=${agent.toPrivateKeyHex()}\nNEXT_PUBLIC_AGENT_ADDRESS=${agent.toBech32()}\nSESSION_SECRET=${randomBytes(48).toString("hex")}\nAPP_ORIGIN=http://localhost:3000\n`,
   { mode: 0o600 },
 );
 const addresses = {

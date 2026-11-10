@@ -18,7 +18,11 @@ export class InjectiveAgentSigner implements AgentSigner {
   constructor() {
     if (!process.env.AGENT_PRIVATE_KEY)
       throw new Error("Testnet agent signer is not configured.");
+    if (!/^(0x)?[a-fA-F0-9]{64}$/.test(process.env.AGENT_PRIVATE_KEY))
+      throw new Error("Testnet agent key configuration is invalid.");
     this.key = PrivateKey.fromHex(process.env.AGENT_PRIVATE_KEY);
+    if (this.key.toBech32() !== process.env.NEXT_PUBLIC_AGENT_ADDRESS)
+      throw new Error("Configured agent address does not match its signer.");
   }
   address() {
     return this.key.toBech32();
