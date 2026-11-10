@@ -1,0 +1,26 @@
+# Verified implementation decision — 10 November 2026
+
+This document was written before application implementation. No deployment or execution is claimed here.
+
+## Sources and live checks
+
+- [Official testnet resources](https://chain.injective.network/testnet): Cosmos chain `injective-888`, RPC `https://sentry.tm.testnet.injective.network`, LCD `https://sentry.lcd.testnet.injective.network`, gRPC-Web `https://sentry.grpc-web.testnet.injective.network`. RPC status independently returned chain `injective-888`, height 147927172, not catching up, block time 2026-11-10T13:26:13Z.
+- [Official public endpoints](https://docs.injective.network/infra/public-endpoints): spot indexer `https://testnet.sentry.exchange.grpc-web.injective.network`; [faucet](https://testnet.faucet.injective.network/); [explorer](https://testnet.explorer.injective.network/). Faucet availability does not establish that USDT can be obtained automatically.
+- Live LCD `/injective/exchange/v1beta1/spot/markets` confirms active INJ/USDT market `0x0611780ba69656949525013d947713300f56c37b6175e02f26bffa495c3208fe`. INJ denom `inj`, 18 decimals; USDT denom `peggy0x87aB3B4C8661e07D6372361211B96ed4Dc36B1B5`, 6 decimals. Chain price tick 0.000000000000001; base quantity tick 1000000000000000; minimum notional 1000000 quote base units. Market active status is not proof of liquidity.
+- [Wallet connections](https://docs.injective.network/developers-native/wallets/connections) and [wallet strategy](https://docs.injective.network/developers-native/wallets/strategy) support Keplr and Injective SDK transaction signing. MVP uses Keplr only.
+- [Authz](https://docs.injective.network/developers-native/core/authz) distinguishes generic authorization from bank send limits. The official [exchange authorization implementation](https://github.com/InjectiveLabs/sdk-go/blob/master/chain/exchange/types/authz_spot.go) checks market and subaccount for CreateSpotMarketOrderAuthz but does not count spending or restrict order size/direction. The v2 implementation has the same restrictions. Bank SendAuthorization does not constrain exchange operations. Native authz is insufficient.
+- [Current CosmWasm integration guidance](https://docs.injective.network/developers-cosmwasm/cosmwasm-any) explicitly recommends protobuf CosmosMsg::Any on CosmWasm 2.0+, instead of older JSON custom bindings. [Official swap guide](https://docs.injective.network/developers-cosmwasm/create-your-swap-contract-guide) and [exchange API](https://api.injective.exchange/) document atomic spot orders for synchronous execution. Rust/CosmWasm is selected; no EVM assumption.
+
+## Architecture
+
+One independently instantiated vault per owner, one immutable current policy and one designated agent. Compile-time testnet chain, INJ/USDT market and denoms. Owner can create a replacement only after revocation/expiry; policy IDs strictly increase. No migration entrypoint or arbitrary calls. Only owner can withdraw to their own address. Agent can submit only atomic buys from the vault's default exchange subaccount; never withdraw or authorize other callers.
+
+Policy stores agent, per-order quote budget, cumulative cap, expiry, and an additional owner-approved maximum price. Execution checks sender, chain, policy ID, market, buy direction, nonce, revocation, chain time, remaining cap and price. Integer quote budgets and integer human-price micro-USDT avoid floating point. Quantity rounds down to verified lot size, with a conservative fee buffer. Atomic reply verifies acquired base balance and net quote debit before committing full authorized quote budget as spent. Any failure bubbles up and rolls back exchange and policy changes. Refunds/deposits/withdrawals never reduce spent. Replacing a policy explicitly creates a new cap; it never silently resets an existing policy.
+
+Agent proposals remain untrusted. Optional server-side LLM returns a strict schema; manual structured proposals remain available without a key. Owner wallet signs narrowly scoped execution intents binding domain/session, vault, chain, policy, nonce, budget and price. Server verifies ownership and signature before the designated testnet agent signs the contract call. Durable audit storage must be configured before server execution is enabled. Refresh recovers submitted hashes from durable records and chain receipts. Browser/demo storage is not authoritative.
+
+## Limitations and verification gates
+
+Atomic orders avoid resting-order revocation ambiguity. Revocation takes effect on inclusion, cannot undo past trades, and may race an already-included trade. Price bounds do not guarantee liquidity or a complete quote-budget fill. Conservative budget reservation intentionally overcounts actual spend. Testnet market admins can change ticks/fees; changes can cause rejection, and must never loosen the budget check. No audited/production safety claim.
+
+Contract deployment, actual exchange fills, and rejected onchain attempts require a funded testnet deployer and agent. No private keys are currently configured. Vercel's connected account currently requires team-access authorization. GitHub profile is connected, but repository creation is not exposed by its connector and needs an available authenticated UI/CLI path. These are tracked as blockers, not completed features.
