@@ -34,6 +34,7 @@ import {
   policyStatus,
 } from "@/lib/config";
 import { display, positive } from "@/lib/amount";
+import { errorMessage } from "@/lib/errors";
 import { proposalSchema, preflight, type Proposal } from "@/lib/proposal";
 import { balances, chainClock, vaultState, receipt } from "@/lib/chain";
 type View = "overview" | "policy" | "funding" | "agent" | "activity";
@@ -176,9 +177,7 @@ export default function Dashboard() {
     try {
       await task();
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Unexpected error. Please retry.",
-      );
+      setError(errorMessage(e));
     } finally {
       setBusy("");
     }
